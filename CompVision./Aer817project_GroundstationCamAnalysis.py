@@ -31,8 +31,9 @@ import time
 
  
 # assuming the image comes back as a grayscale:
-
-gray_img = cv2.imread("D:\Alessandro\FILESFORSCHOOL\AER817\HumanThermalimage_2_gray.bmp")
+#note: use image's 1 and 2 for testing to detect yellow hsv colour ranges and use image 3 for contour testing
+gray_img = cv2.imread("D:\Alessandro\FILESFORSCHOOL\AER817\HumanThermalimage_3_gray.bmp")
+colour_img = cv2.imread("D:\Alessandro\FILESFORSCHOOL\AER817\HumanThermalimage_3.bmp")
 
 #adding some colour:==>from==> https://stackoverflow.com/questions/58135918/giving-grayscale-image-color
 '''
@@ -73,41 +74,54 @@ def nothing(x):
     pass
 
 
-# Creating a window for later use (in order to see track bar)
 
-#for upper bounds:
-cv2.namedWindow('result')
+hsvTest = 'N'
 
-cv2.createTrackbar('h_lower', 'result', 0, 179,nothing) # ranges H:0-179,S=0-255,v=0-255
-cv2.createTrackbar('s_lower', 'result', 0, 255,nothing)
-cv2.createTrackbar('v_lower', 'result', 0, 255,nothing)
+if (hsvTest == 'Y'):
+
+    # Creating a window for later use (in order to see track bar)
+
+    #for upper bounds:
+    cv2.namedWindow('result')
+    cv2.createTrackbar('h_lower', 'result', 0, 179,nothing) # ranges H:0-179,S=0-255,v=0-255
+    cv2.createTrackbar('s_lower', 'result', 0, 255,nothing)
+    cv2.createTrackbar('v_lower', 'result', 0, 255,nothing)
 
 
-cv2.createTrackbar('h_upper', 'result', 0, 179,nothing)  # ranges H:0-180,S=0-255,v=0-255
-cv2.createTrackbar('s_upper', 'result', 0, 255,nothing)
-cv2.createTrackbar('v_upper', 'result', 0, 255,nothing)
+    cv2.createTrackbar('h_upper', 'result', 0, 179,nothing)  # ranges H:0-180,S=0-255,v=0-255
+    cv2.createTrackbar('s_upper', 'result', 0, 255,nothing)
+    cv2.createTrackbar('v_upper', 'result', 0, 255,nothing)
 
 while(1):
             
-    # get info from track bar and appy to result
+    if (hsvTest == 'Y'):
+        # get info from track bar and apply to result for testing:
+        
+        #for lower bounds:
+        h_lower = cv2.getTrackbarPos('h_lower', 'result')
+        s_lower = cv2.getTrackbarPos('s_lower', 'result')
+        v_lower = cv2.getTrackbarPos('v_lower', 'result')
 
-    #for lower bounds:
-    h_lower = cv2.getTrackbarPos('h_lower', 'result')
-    s_lower = cv2.getTrackbarPos('s_lower', 'result')
-    v_lower = cv2.getTrackbarPos('v_lower', 'result')
-
-    #for upper bounds:
-    h_upper = cv2.getTrackbarPos('h_upper', 'result')
-    s_upper = cv2.getTrackbarPos('s_upper', 'result')
-    v_upper = cv2.getTrackbarPos('v_upper', 'result')
+        #for upper bounds:
+        h_upper = cv2.getTrackbarPos('h_upper', 'result')
+        s_upper = cv2.getTrackbarPos('s_upper', 'result')
+        v_upper = cv2.getTrackbarPos('v_upper', 'result')
 
     #applying the trackbar values:
-    lowerBound = np.array([h_lower, s_lower, v_lower]) # array numbers from(3rd array ("v") represents brightness lvl, usually want range to be in betw. 20 and 255)==> https://stackoverflow.com/questions/48528754/what-are-recommended-color-spaces-for-detecting-orange-color-in-open-cv
+    ''' 
+    yellow hsv ranges are:
+    lowerBound = (28,58,78)
+    upperBound = (31,255,255)
+    
+    '''
+    yellowLowerBound = [28, 58, 78]
+    yellowUpperBound = [31, 255, 255]
+    
+    lowerBound = np.array(yellowLowerBound) # array numbers from(3rd array ("v") represents brightness lvl, usually want range to be in betw. 20 and 255)==> https://stackoverflow.com/questions/48528754/what-are-recommended-color-spaces-for-detecting-orange-color-in-open-cv
 
-    upperBound = np.array([h_upper, s_upper,v_upper])# want to cover whole range of colour "rectangle" (so use corner to corner values)
+    upperBound = np.array(yellowUpperBound)# want to cover whole range of colour "rectangle" (so use corner to corner values)
 
-
-
+  
 
     # Threshold the HSV image to get only yellow colors
     mask = cv2.inRange(hsv_grayimg, lowerBound, upperBound)
@@ -116,7 +130,40 @@ while(1):
     res = cv2.bitwise_and(hsv_grayimg, hsv_grayimg, mask=mask) #only displays pixel if both images have the same pixel location and colour as tha mask 
 
     #cv2.imshow('yellow mask', mask)
-    cv2.imshow('res', res)
+    cv2.imshow('original colour image', colour_img)
+
+    cv2.imshow('hsv result', res)
+    cv2.imshow('original gray image', gray_img)
+
+    cv2.imshow('hsv gray image', hsv_grayimg)
+
+    #apply contour algorithm to detect human body shape:
+    '''
+    References for detecting human body contour:
+    
+    1. https://stackoverflow.com/questions/51705792/how-to-contour-human-body-in-an-image-using-ppencv
+    2.https://docs.opencv.org/3.1.0/db/d5c/tutorial_py_bg_subtraction.html
+    3.https://github.com/quanhua92/human-pose-estimation-opencv/blob/master/openpose.py
+    
+    
+    
+    '''
+    
+
+    # Search for edges in the image with cv2.Canny().
+    edges = cv2.Canny(res, 150, 200)
+
+    # Search for contours in the edged image with cv2.findContour().
+    contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    # Filter out contours that are not in your interest by applying size criterion.
+    for cnt in contours:
+        size = cv2.contourArea(cnt)
+        if size > 100:
+            cv2.drawContours(res, [cnt], -1, (255, 0, 0), 3)
+    
+    cv2.imshow('contour result', res)
+
 
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break
